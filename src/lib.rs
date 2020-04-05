@@ -10,11 +10,28 @@ use std::ptr;
 #[cfg(feature = "edgetpu")]
 pub mod edgetpu;
 
-enum TfLiteDelegate {}
-enum TfLiteInterpreter {}
-enum TfLiteInterpreterOptions {}
-enum TfLiteModel {}
-pub enum Tensor {} // aka TfLiteTensor
+// Opaque types from the C interface.
+// https://doc.rust-lang.org/nomicon/ffi.html#representing-opaque-structs
+#[repr(C)]
+struct TfLiteDelegate {
+    _private: [u8; 0],
+}
+#[repr(C)]
+struct TfLiteInterpreter {
+    _private: [u8; 0],
+}
+#[repr(C)]
+struct TfLiteInterpreterOptions {
+    _private: [u8; 0],
+}
+#[repr(C)]
+struct TfLiteModel {
+    _private: [u8; 0],
+}
+#[repr(C)]
+pub struct Tensor {
+    _private: [u8; 0],
+} // aka TfLiteTensor
 
 // Type, aka TfLiteType
 #[derive(Copy, Clone, PartialEq, Eq)]
