@@ -105,6 +105,7 @@ impl TfLiteStatus {
 
 pub struct InterpreterBuilder<'a> {
     options: ptr::NonNull<TfLiteInterpreterOptions>,
+    owned_delegates: Vec<Delegate>,
     _delegate_refs: PhantomData<&'a ()>,
 }
 
@@ -112,19 +113,26 @@ impl<'a> InterpreterBuilder<'a> {
     pub fn new() -> Self {
         Self {
             options: ptr::NonNull::new(unsafe { TfLiteInterpreterOptionsCreate() }).unwrap(),
+            owned_delegates: Vec::new(),
             _delegate_refs: PhantomData,
         }
     }
 
-    pub fn add_delegate(&mut self, d: &'a Delegate) {
+    pub fn add_borrowed_delegate(&mut self, d: &'a Delegate) {
         unsafe { TfLiteInterpreterOptionsAddDelegate(self.options.as_ptr(), d.delegate.as_ptr()) }
     }
 
-    pub fn build(self, model: &Model) -> Result<Interpreter<'a>, ()> {
+    pub fn add_owned_delegate(&mut self, d: Delegate) {
+        unsafe { TfLiteInterpreterOptionsAddDelegate(self.options.as_ptr(), d.delegate.as_ptr()) }
+        self.owned_delegates.push(d);
+    }
+
+    pub fn build(mut self, model: &Model) -> Result<Interpreter<'a>, ()> {
         let interpreter =
             unsafe { TfLiteInterpreterCreate(model.0.as_ptr(), self.options.as_ptr()) };
         let interpreter = Interpreter {
             interpreter: ptr::NonNull::new(interpreter).ok_or(())?,
+            _owned_delegates: std::mem::replace(&mut self.owned_delegates, Vec::new()),
             _delegate_refs: PhantomData,
         };
         unsafe { TfLiteInterpreterAllocateTensors(interpreter.interpreter.as_ptr()) }
@@ -141,6 +149,7 @@ impl<'a> Drop for InterpreterBuilder<'a> {
 
 pub struct Interpreter<'a> {
     interpreter: ptr::NonNull<TfLiteInterpreter>,
+    _owned_delegates: Vec<Delegate>,
     _delegate_refs: PhantomData<&'a ()>,
 }
 
@@ -355,13 +364,13 @@ mod tests {
     fn lifecycle_edgetpu() {
         static EDGETPU_MODEL: &'static [u8] = include_bytes!("testdata/edgetpu.tflite");
         let m = super::Model::from_static(EDGETPU_MODEL).unwrap();
-        let delegate;
         let mut builder = super::Interpreter::builder();
         let devices = super::edgetpu::Devices::list();
-        if !devices.is_empty() {
-            delegate = devices[0].create_delegate().unwrap();
-            builder.add_delegate(&delegate);
+        if devices.is_empty() {
+            panic!("need an edge tpu installed to run edge tpu tests");
         }
+        let delegate = devices[0].create_delegate().unwrap();
+        builder.add_owned_delegate(delegate);
         let mut interpreter = builder.build(&m).unwrap();
         println!(
             "interpreter with {} inputs, {} outputs",
