@@ -2,8 +2,9 @@
 
 This is a simple Rust wrapper around the [TensorFlow
 Lite](https://www.tensorflow.org/lite) and
-[edgetpu](https://github.com/google-coral/edgetpu) libraries written by
-Scott Lamb &lt;slamb@slamb.org>.
+[edgetpu](https://github.com/google-coral/edgetpu) libraries, written by
+Scott Lamb &lt;slamb@slamb.org>. It's primarily made to support video
+analytics in [Moonfire NVR](https://github.com/scottlamb/moonfire-nvr).
 
 As compared to the [tflite crate](https://crates.io/crates/tflite), advantages:
 
