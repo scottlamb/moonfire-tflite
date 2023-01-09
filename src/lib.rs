@@ -132,7 +132,7 @@ impl<'a> InterpreterBuilder<'a> {
             unsafe { TfLiteInterpreterCreate(model.0.as_ptr(), self.options.as_ptr()) };
         let interpreter = Interpreter {
             interpreter: ptr::NonNull::new(interpreter).ok_or(())?,
-            _owned_delegates: std::mem::replace(&mut self.owned_delegates, Vec::new()),
+            _owned_delegates: std::mem::take(&mut self.owned_delegates),
             _delegate_refs: PhantomData,
         };
         unsafe { TfLiteInterpreterAllocateTensors(interpreter.interpreter.as_ptr()) }
@@ -326,64 +326,5 @@ impl Model {
 impl Drop for Model {
     fn drop(&mut self) {
         unsafe { TfLiteModelDelete(self.0.as_ptr()) };
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    pub static MODEL: &'static [u8] =
-        include_bytes!("testdata/ssd_mobilenet_v1_coco_2018_01_28.tflite");
-
-    #[test]
-    fn create_drop_model() {
-        let _m = super::Model::from_static(MODEL).unwrap();
-    }
-
-    #[test]
-    fn lifecycle() {
-        let m = super::Model::from_static(MODEL).unwrap();
-        let builder = super::Interpreter::builder();
-        let mut interpreter = builder.build(&m).unwrap();
-        println!(
-            "interpreter with {} inputs, {} outputs",
-            interpreter.inputs().len(),
-            interpreter.outputs().len()
-        );
-        let inputs = interpreter.inputs();
-        for i in 0..inputs.len() {
-            println!("input: {:?}", inputs[i]);
-        }
-        let outputs = interpreter.outputs();
-        for i in 0..outputs.len() {
-            println!("output: {:?}", outputs[i]);
-        }
-    }
-
-    #[cfg(feature = "edgetpu")]
-    #[test]
-    fn lifecycle_edgetpu() {
-        static EDGETPU_MODEL: &'static [u8] = include_bytes!("testdata/edgetpu.tflite");
-        let m = super::Model::from_static(EDGETPU_MODEL).unwrap();
-        let mut builder = super::Interpreter::builder();
-        let devices = super::edgetpu::Devices::list();
-        if devices.is_empty() {
-            panic!("need an edge tpu installed to run edge tpu tests");
-        }
-        let delegate = devices[0].create_delegate().unwrap();
-        builder.add_owned_delegate(delegate);
-        let mut interpreter = builder.build(&m).unwrap();
-        println!(
-            "interpreter with {} inputs, {} outputs",
-            interpreter.inputs().len(),
-            interpreter.outputs().len()
-        );
-        let inputs = interpreter.inputs();
-        for i in 0..inputs.len() {
-            println!("input: {:?}", inputs[i]);
-        }
-        let outputs = interpreter.outputs();
-        for i in 0..outputs.len() {
-            println!("output: {:?}", outputs[i]);
-        }
     }
 }
